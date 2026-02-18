@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#16120C">
+<title>AZ Burn Profiles</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@300;400;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{--fire:#FF4500;--ember:#FF8C00;--ash:#C8B89A;--char:#16120C;--card:#1E1912;--card2:#231F18;--border:rgba(200,184,154,0.1);--low:#56C077;--mod:#FFC107;--high:#FF6B35;--ext:#E53935;--low-bg:rgba(86,192,119,0.15);--mod-bg:rgba(255,193,7,0.12);--high-bg:rgba(255,107,53,0.14);--ext-bg:rgba(229,57,53,0.16);--safe:env(safe-area-inset-bottom,0px);}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;background:var(--char);font-family:'Barlow',sans-serif;font-weight:300;color:var(--ash);overflow:hidden;}
+#app{display:flex;flex-direction:column;height:100%;height:100dvh;}
+
+/* ─ HEADER ─ */
+.app-header{flex-shrink:0;padding:50px 20px 14px;background:linear-gradient(180deg,rgba(255,69,0,0.1),transparent);position:relative;}
+.app-header::after{content:'';position:absolute;bottom:0;left:20px;right:20px;height:1px;background:linear-gradient(90deg,transparent,rgba(255,69,0,0.4),transparent);}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.header-eyebrow{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:9px;letter-spacing:.28em;text-transform:uppercase;color:var(--ember);}
+.source-chips{display:flex;gap:4px;}
+.chip{font-family:'Barlow Condensed',sans-serif;font-size:8.5px;letter-spacing:.08em;color:rgba(200,184,154,.45);background:rgba(255,140,0,.06);border:1px solid rgba(255,140,0,.18);border-radius:2px;padding:2px 6px;white-space:nowrap;}
+.app-title{font-family:'Bebas Neue',sans-serif;font-size:42px;line-height:.9;letter-spacing:.02em;color:#fff;text-shadow:0 0 30px rgba(255,69,0,.3);margin-bottom:14px;}
+.app-title span{color:var(--fire);}
+
+/* ─ SEARCH ─ */
+.search-wrap{position:relative;}
+.search-input{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:11px 36px 11px 40px;font-family:'Barlow',sans-serif;font-size:15px;color:#fff;outline:none;caret-color:var(--ember);transition:border-color .2s,background .2s;}
+.search-input::placeholder{color:rgba(200,184,154,.3);}
+.search-input:focus{border-color:rgba(255,69,0,.4);background:rgba(255,255,255,.06);}
+.search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:16px;height:16px;opacity:.35;pointer-events:none;}
+.clear-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:rgba(200,184,154,.15);border:none;border-radius:50%;width:22px;height:22px;display:none;align-items:center;justify-content:center;cursor:pointer;color:var(--ash);font-size:12px;}
+.clear-btn.visible{display:flex;}
+
+/* ─ FILTERS ─ */
+.filter-row{display:flex;gap:6px;padding:10px 20px 8px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+.filter-row::-webkit-scrollbar{display:none;}
+.filter-btn{flex-shrink:0;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:5px 13px;border-radius:20px;border:1px solid var(--border);background:transparent;color:rgba(200,184,154,.5);cursor:pointer;transition:all .18s;white-space:nowrap;}
+.filter-btn.active{background:rgba(255,69,0,.15);border-color:rgba(255,69,0,.4);color:var(--fire);}
+.filter-btn:active{transform:scale(.96);}
+
+/* ─ RESULTS ─ */
+.results-bar{padding:0 20px 6px;flex-shrink:0;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:rgba(200,184,154,.3);display:flex;align-items:center;gap:8px;}
+.loading-dot{width:6px;height:6px;border-radius:50%;background:var(--ember);animation:pulse 1.2s infinite;display:none;}
+.loading-dot.visible{display:block;}
+@keyframes pulse{0%,100%{opacity:.2;}50%{opacity:1;}}
+
+/* ─ GRID ─ */
+.cards-scroll{flex:1;overflow-y:auto;padding:0 20px;padding-bottom:calc(16px + var(--safe));-webkit-overflow-scrolling:touch;}
+.cards-scroll::-webkit-scrollbar{display:none;}
+.cards-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+/* ─ CARD ─ */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .15s,border-color .15s;animation:fadeUp .3s ease both;}
+.card:active{transform:scale(.97);}
+.card:hover{border-color:rgba(255,69,0,.3);}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+
+/* ─ PHOTO STATES ─ */
+.photo-box{width:100%;aspect-ratio:4/3;position:relative;overflow:hidden;background:linear-gradient(135deg,#231F18,#2A2218);flex-shrink:0;}
+.photo-box img{width:100%;height:100%;object-fit:cover;display:block;transition:opacity .3s;}
+.photo-box img.loading{opacity:0;}
+.photo-box img.loaded{opacity:1;}
+.photo-box::after{content:'';position:absolute;bottom:0;left:0;right:0;height:45%;background:linear-gradient(transparent,var(--card));pointer-events:none;}
+.photo-placeholder{width:100%;aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:linear-gradient(135deg,#231F18,#2A2218);color:rgba(200,184,154,.25);}
+.photo-placeholder span{font-size:32px;}
+.photo-placeholder small{font-family:'Barlow Condensed',sans-serif;font-size:8px;letter-spacing:.12em;text-transform:uppercase;}
+.shimmer{width:100%;aspect-ratio:4/3;background:linear-gradient(90deg,#231F18 25%,#2d2820 50%,#231F18 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
+@keyframes shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+
+/* source label top-left */
+.photo-src{position:absolute;top:6px;left:6px;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);border-radius:4px;padding:2px 6px;font-family:'Barlow Condensed',sans-serif;font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6);z-index:2;}
+
+.card-body{padding:9px 10px 10px;}
+.card-cat{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:8.5px;letter-spacing:.2em;text-transform:uppercase;color:rgba(200,184,154,.35);margin-bottom:3px;}
+.card-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:#fff;line-height:1.15;margin-bottom:2px;}
+.card-sci{font-style:italic;font-size:9px;color:rgba(200,184,154,.35);margin-bottom:6px;display:block;}
+.sev-pill{display:inline-block;padding:2px 7px;border-radius:10px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:9px;letter-spacing:.08em;text-transform:uppercase;}
+.sev-low{background:var(--low-bg);color:var(--low);}
+.sev-mod{background:var(--mod-bg);color:var(--mod);}
+.sev-high{background:var(--high-bg);color:var(--high);}
+.sev-ext{background:var(--ext-bg);color:var(--ext);}
+.sev-var{background:rgba(140,140,255,.12);color:#9898ff;}
+
+/* ─ EMPTY ─ */
+.empty-state{display:none;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;gap:12px;}
+.empty-state.visible{display:flex;}
+.empty-emoji{font-size:48px;}
+.empty-txt{font-family:'Barlow Condensed',sans-serif;font-size:15px;letter-spacing:.05em;color:rgba(200,184,154,.4);}
+
+/* ─ MODAL ─ */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:100;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(5px);}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal{position:fixed;bottom:0;left:0;right:0;z-index:101;background:var(--card2);border-radius:22px 22px 0 0;max-height:92dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);padding-bottom:calc(24px + var(--safe));}
+.modal.open{transform:translateY(0);}
+.modal::-webkit-scrollbar{display:none;}
+.modal-handle{width:36px;height:4px;border-radius:2px;background:rgba(200,184,154,.2);margin:12px auto 0;}
+.modal-close-row{display:flex;justify-content:flex-end;padding:8px 16px 0;}
+.close-btn{background:rgba(200,184,154,.1);border:1px solid var(--border);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:rgba(200,184,154,.7);}
+
+/* ─ MODAL GALLERY ─ */
+.modal-gallery{position:relative;width:100%;height:240px;background:linear-gradient(135deg,#231F18,#2A2218);overflow:hidden;}
+.gallery-main{width:100%;height:100%;object-fit:cover;display:block;transition:opacity .3s;}
+.gallery-main.fading{opacity:0;}
+.gallery-overlay{position:absolute;bottom:0;left:0;right:0;height:60%;background:linear-gradient(transparent,var(--card2));pointer-events:none;}
+.gallery-badge{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);border-radius:5px;padding:3px 8px;font-family:'Barlow Condensed',sans-serif;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7);z-index:3;display:flex;align-items:center;gap:4px;}
+.gallery-src{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);border-radius:4px;padding:3px 8px;font-family:'Barlow Condensed',sans-serif;font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55);z-index:3;}
+.gallery-thumbs{position:absolute;bottom:10px;left:0;right:0;display:flex;justify-content:center;gap:6px;z-index:4;}
+.gthumb{width:36px;height:36px;border-radius:5px;object-fit:cover;border:2px solid transparent;cursor:pointer;transition:border-color .15s,transform .15s;background:#231F18;}
+.gthumb.active{border-color:var(--ember);}
+.gthumb:active{transform:scale(.93);}
+.gallery-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:72px;}
+.gallery-counter{position:absolute;bottom:52px;right:10px;font-family:'Barlow Condensed',sans-serif;font-size:10px;color:rgba(255,255,255,.4);z-index:4;}
+
+/* ─ MODAL CONTENT ─ */
+.modal-content{padding:14px 20px 0;}
+.modal-eyebrow{font-family:'Barlow Condensed',sans-serif;font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ember);margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.modal-name{font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:.02em;color:#fff;line-height:1;margin-bottom:3px;}
+.modal-sci{font-style:italic;font-size:12px;color:rgba(200,184,154,.4);margin-bottom:12px;display:block;}
+.inv-badge{background:rgba(229,57,53,.15);color:var(--ext);border:1px solid rgba(229,57,53,.3);border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;}
+.modal-sev{display:inline-block;padding:4px 12px;border-radius:20px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px;}
+
+/* ─ STATS ─ */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;}
+.stat-box{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+.stat-label{font-family:'Barlow Condensed',sans-serif;font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;color:rgba(200,184,154,.35);margin-bottom:4px;}
+.stat-val{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:#fff;line-height:1.1;}
+.fbar{display:flex;align-items:center;gap:6px;margin-top:5px;}
+.ftrack{flex:1;height:4px;background:rgba(200,184,154,.1);border-radius:2px;overflow:hidden;}
+.ffill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--ember),var(--fire));}
+
+.sh{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:rgba(200,184,154,.35);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+.desc-txt{font-size:13px;line-height:1.6;margin-bottom:14px;color:rgba(200,184,154,.75);}
+.tags-row{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px;}
+.tag{display:inline-block;font-family:'Barlow Condensed',sans-serif;font-size:9.5px;letter-spacing:.05em;padding:3px 8px;border-radius:4px;white-space:nowrap;}
+.t-rs{color:#81C784;background:rgba(129,199,132,.12);border:1px solid rgba(129,199,132,.2);}
+.t-sd{color:#64B5F6;background:rgba(100,181,246,.1);border:1px solid rgba(100,181,246,.2);}
+.t-fk{color:#EF9A9A;background:rgba(239,154,154,.1);border:1px solid rgba(239,154,154,.2);}
+.t-ob{color:#FFB74D;background:rgba(255,183,77,.1);border:1px solid rgba(255,183,77,.2);}
+.t-in{color:#FF8A65;background:rgba(255,138,101,.1);border:1px solid rgba(255,138,101,.2);}
+.t-to{color:#CE93D8;background:rgba(206,147,216,.1);border:1px solid rgba(206,147,216,.2);}
+.feis-block{background:rgba(255,140,0,.06);border:1px solid rgba(255,140,0,.15);border-left:3px solid var(--ember);border-radius:0 8px 8px 0;padding:10px 12px;margin-bottom:14px;font-size:12px;line-height:1.6;color:rgba(200,184,154,.65);}
+.feis-cite{font-family:'Barlow Condensed',sans-serif;font-size:9.5px;letter-spacing:.05em;color:rgba(255,140,0,.5);display:block;margin-top:5px;}
+
+.feis-link{display:flex;align-items:center;gap:8px;background:rgba(255,140,0,.08);border:1px solid rgba(255,140,0,.25);border-radius:10px;padding:10px 14px;margin-bottom:14px;text-decoration:none;color:rgba(200,184,154,.7);transition:background .18s,border-color .18s;}
+.feis-link:hover{background:rgba(255,140,0,.14);border-color:rgba(255,140,0,.4);}
+.feis-link-icon{font-size:18px;flex-shrink:0;}
+.feis-link-txt{font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:.08em;}
+.feis-link-txt strong{display:block;color:var(--ember);font-size:12px;}
+.feis-link-arrow{margin-left:auto;font-size:16px;opacity:.4;}
+.feis-link-nodoc{opacity:.65;}
+.feis-link-nodoc .feis-link-txt strong{color:rgba(255,140,0,.6);}
+
+/* ─ INAT LINK ─ */
+.inat-link{display:flex;align-items:center;gap:8px;background:rgba(116,185,0,.08);border:1px solid rgba(116,185,0,.2);border-radius:10px;padding:10px 14px;margin-bottom:14px;text-decoration:none;color:rgba(200,184,154,.7);}
+.inat-link-icon{font-size:18px;}
+.inat-link-txt{font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:.08em;}
+.inat-link-txt strong{display:block;color:#8BC34A;font-size:12px;}
+.inat-link-arrow{margin-left:auto;font-size:16px;opacity:.4;}
+
+/* ─ INAT PHOTO LINK BADGE ─ */
+.photo-inat-link{position:absolute;top:6px;right:6px;z-index:5;background:rgba(116,185,0,0.82);backdrop-filter:blur(4px);border-radius:4px;padding:2px 6px;font-family:'Barlow Condensed',sans-serif;font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:#fff;text-decoration:none;display:flex;align-items:center;gap:3px;transition:background .15s;}
+.photo-inat-link:hover{background:rgba(116,185,0,1);}
+.photo-inat-link svg{width:9px;height:9px;flex-shrink:0;}
+
+/* ─ INAT PHOTO LINK BADGE ─ */
+.photo-inat-link{position:absolute;top:6px;right:6px;z-index:5;background:rgba(74,148,0,0.88);backdrop-filter:blur(4px);border-radius:4px;padding:2px 7px 2px 5px;font-family:'Barlow Condensed',sans-serif;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:#fff;text-decoration:none;display:flex;align-items:center;gap:3px;transition:background .15s;line-height:1;}
+.photo-inat-link:hover{background:rgba(74,148,0,1);}
+.photo-inat-link svg{width:9px;height:9px;flex-shrink:0;}
+/* ─ MAP SECTION ─ */
+.map-section{margin-bottom:14px;}
+.map-container{width:100%;height:220px;border-radius:10px 10px 0 0;overflow:hidden;border:1px solid rgba(255,140,0,.2);border-bottom:none;position:relative;background:#1a1708;}
+.map-note-box{background:rgba(255,140,0,.07);border:1px solid rgba(255,140,0,.18);border-radius:0 0 10px 10px;padding:7px 12px;font-family:'Barlow Condensed',sans-serif;font-size:11px;color:rgba(200,184,154,.65);letter-spacing:.03em;line-height:1.4;}
+/* Leaflet dark tile override */
+.leaflet-tile-pane{filter:brightness(.55) saturate(.5) sepia(.4);}
+.leaflet-popup-content-wrapper{background:#1E1912;border:1px solid rgba(255,140,0,.3);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.7);}
+.leaflet-popup-content{color:var(--ash);font-family:'Barlow Condensed',sans-serif;font-size:12px;margin:8px 12px;line-height:1.5;}
+.leaflet-popup-tip{background:#1E1912;}
+.leaflet-popup-close-button{color:rgba(200,184,154,.5)!important;}
+.leaflet-control-zoom a{background:#1E1912!important;border-color:rgba(255,140,0,.25)!important;color:var(--ash)!important;font-size:16px!important;}
+.leaflet-control-zoom a:hover{background:#2a2418!important;}
+.leaflet-control-attribution{background:rgba(22,18,12,.8)!important;color:rgba(200,184,154,.25)!important;font-size:7px!important;}
+.leaflet-control-attribution a{color:rgba(255,140,0,.35)!important;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="app-header">
+    <div class="header-top">
+      <div class="header-eyebrow">🔥 Arizona · Fire Ecology</div>
+      <div class="source-chips">
+        <span class="chip">iNaturalist</span>
+        <span class="chip">FEIS·USDA</span>
+      </div>
+    </div>
+    <div class="app-title">AZ <span>Burn</span><br>Profiles</div>
+    <div class="search-wrap">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input class="search-input" id="searchInput" type="search" placeholder="Search species…" autocomplete="off" autocorrect="off" spellcheck="false">
+      <button class="clear-btn" id="clearBtn" onclick="clearSearch()">✕</button>
+    </div>
+  </div>
+
+  <div class="filter-row">
+    <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+    <button class="filter-btn" onclick="setFilter('tree',this)">🌲 Trees</button>
+    <button class="filter-btn" onclick="setFilter('shrub',this)">🌿 Shrubs</button>
+    <button class="filter-btn" onclick="setFilter('forb',this)">🌼 Forbs</button>
+    <button class="filter-btn" onclick="setFilter('grass',this)">🌾 Grasses</button>
+    <button class="filter-btn" onclick="setFilter('invasive',this)">⚠ Invasive</button>
+  </div>
+
+  <div class="results-bar">
+    <span id="resultsBar">23 species</span>
+    <span class="loading-dot" id="loadingDot"></span>
+  </div>
+
+  <div class="cards-scroll">
+    <div class="cards-grid" id="cardsGrid"></div>
+    <div class="empty-state" id="emptyState">
+      <div class="empty-emoji">🔍</div>
+      <div class="empty-txt">No species match your search</div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal()"></div>
+<div class="modal" id="modal">
+  <div class="modal-handle"></div>
+  <div class="modal-close-row"><button class="close-btn" onclick="closeModal()">✕</button></div>
+  <div id="modalInner"></div>
+</div>
+
+<script>
+// ── SPECIES DATA ──────────────────────────────────────────────────────────────
+// inatName = exact scientific name for iNaturalist API taxon search
+// wikiPage = Wikipedia page slug fallback
+const SPECIES = [
+  // TREES
+  {id:'ponderosa',cat:'tree',catLabel:'Tree',icon:'🌲',invasive:false,
+   name:'Ponderosa Pine',sci:'Pinus ponderosa',inatName:'Pinus ponderosa',wikiPage:'Pinus_ponderosa',
+   inatUrl:'https://www.inaturalist.org/taxa/48461',
+   feisUrl:'https://research.fs.usda.gov/feis/species-reviews/pinpons',
+   mapLat:34.7,mapLng:-111.5,mapZoom:7,
+   mapNote:'Dominant across the Mogollon Rim, Flagstaff Plateau, and AZ Sky Islands above 5,500 ft',
+   zone:'Montane · 5,500–8,500 ft',severity:'mod',sevLabel:'Moderate',
+   fri:'2–15 yrs',friPct:20,flame:'2–6 ft',flamePct:40,ros:'Low–Moderate',fuel:'Surface litter & grass understory',
+   immEffect:'Mature trees survive low/moderate surface fire; seedlings <3–5 yrs of age or <6 in DBH killed; trees in dense stands and mistletoe-infected trees most susceptible',
+   tags:['t-to:Fire-tolerant (mature)','t-sd:Off-site seeder','t-fk:Seedling fire-killed'],
+   feis:'Mean ~10 yr FRI historically; AZ/NM sky island sites mean 3.7–4.2 yr. Thick bark insulates mature cambium. Fire exclusion since ~1930s increased fuels & stand density, shifting fire regime toward high-severity. Mineral soil exposed by fire enables best seedling regeneration.',
+   cite:'FEIS: Fryer 2018 (Pinus ponderosa)'},
+
+  {id:'azpine',cat:'tree',catLabel:'Tree',icon:'🌲',invasive:false,
+   name:'Arizona Pine',sci:'Pinus arizonica',inatName:'Pinus arizonica',wikiPage:'Pinus_arizonica',
+   inatUrl:'https://www.inaturalist.org/taxa/135775',
+   feisUrl:'https://research.fs.usda.gov/feis/species-reviews/pinari',
+   mapLat:31.9,mapLng:-109.3,mapZoom:8,
+   mapNote:'SE AZ Sky Islands: Chiricahuas, Huachucas, Santa Ritas, Rincons · 7,200–9,000 ft',
+   zone:'Sky Islands · 7,200–9,000 ft',severity:'low',sevLabel:'Low–Moderate',
+   fri:'2–15 yrs',friPct:18,flame:'2–5 ft',flamePct:38,ros:'Low',fuel:'Grass-carried surface fire',
+   immEffect:'Small trees and seedlings highly susceptible; larger trees in open park-like stands tolerate low-to-moderate surface fire; dwarf mistletoe infection and dense stand conditions increase vulnerability significantly',
+   tags:['t-to:Surface-fire adapted','t-sd:Crown residual colonizer'],
+   feis:'Range 1–17 yr; Chiricahua mean 3.7 yr. Historically parklike open stands with thick grass understory before fire exclusion. El Niño wet years increase fine fuels 1–4 yrs before fire years. Cross-elevation fire corridor with pine-oak gallery.',
+   cite:'FEIS: Howard 2003 (Pinus arizonica)'},
+
+  {id:'mesquite',cat:'tree',catLabel:'Tree',icon:'🌳',invasive:false,
+   name:'Velvet Mesquite',sci:'Prosopis velutina',inatName:'Neltuma velutina',wikiPage:'Prosopis_velutina',
+   inatUrl:'https://www.inaturalist.org/taxa/1493168',
+   feisUrl:'https://www.fs.usda.gov/database/feis/plants/tree/provel/all.html',
+   mapLat:32.0,mapLng:-111.0,mapZoom:7,
+   mapNote:'Sonoran Desert bajadas, riparian corridors, and desert grasslands statewide below 4,500 ft',
+   zone:'Desert Grassland · <4,500 ft',severity:'var',sevLabel:'Variable',
+   fri:'5–15 yrs',friPct:30,flame:'1–3 ft',flamePct:25,ros:'Low',fuel:'Fuel-limited in dense mesquite stands',
+   immEffect:'Seedlings (12 mo, June fire): 65% killed, 25% top-killed. Mature plant mortality: ~29% in June burns, 4–10% in Nov/Feb burns at Santa Rita Experimental Range (Cable).',
+   tags:['t-rs:Crown resprouter','t-rs:Basal resprouter','t-in:Post-fire increaser'],
+   feis:'Resprouts to 105% preburn height within 4 yrs; flowers and sets seed by yr 6. Prescribed burning not effective for control. Where mesquite displaces grass, fuels too sparse to carry effective fire — a self-reinforcing cycle.',
+   cite:'FEIS: Uchytil 1990 (Prosopis velutina)'},
+
+  {id:'oneseed',cat:'tree',catLabel:'Tree',icon:'🌲',invasive:false,
+   name:'One-seed Juniper',sci:'Juniperus monosperma',inatName:'Juniperus monosperma',wikiPage:'Juniperus_monosperma',
+   inatUrl:'https://www.inaturalist.org/taxa/120145',
+   feisUrl:'https://www.fs.usda.gov/database/feis/plants/tree/junmon/all.html',
+   mapLat:35.2,mapLng:-111.6,mapZoom:7,
+   mapNote:'Colorado Plateau P-J woodlands: Flagstaff north, Wupatki, Navajo Plateau · 4,500–7,000 ft',
+   zone:'P-J Woodland · 4,500–7,000 ft',severity:'high',sevLabel:'High',
+   fri:'10–40 yrs',friPct:50,flame:'5–12 ft',flamePct:60,ros:'Moderate–High',fuel:'Volatile crown oils; sparse herbaceous understory',
+   immEffect:'100% mortality when 60% of crown scorched; lethal tissue temps 140–176°F; volatile oils accelerate combustion dramatically',
+   tags:['t-fk:Usually fire-killed','t-sd:Off-site seeder only'],
+   feis:'Only 10% resprout in AZ burns vs 42% for alligator juniper (Tirmenstein 1989). Recovery not prominent until postfire yr 40 (Utah study, Johnson 2002). Widely burned to control juniper encroachment. January, March, June burns at Flagstaff/Wupatki compared by Jameson.',
+   cite:'FEIS: Johnson 2002 (Juniperus monosperma)'},
+
+  {id:'alligator',cat:'tree',catLabel:'Tree',icon:'🌲',invasive:false,
+   name:'Alligator Juniper',sci:'Juniperus deppeana',inatName:'Juniperus deppeana',wikiPage:'Juniperus_deppeana',
+   inatUrl:'https://www.inaturalist.org/taxa/121924',
+   feisUrl:'https://research.fs.usda.gov/feis/species-reviews/jundep',
+   mapLat:33.8,mapLng:-110.8,mapZoom:7,
+   mapNote:'Pine-oak woodland belt: Mogollon Rim, Mazatzal, Sierra Ancha, SE AZ mountains · 4,500–8,000 ft',
+   zone:'Pine-Oak Woodland · 4,500–8,000 ft',severity:'mod',sevLabel:'Moderate',
+   fri:'10–38 yrs',friPct:35,flame:'3–8 ft',flamePct:45,ros:'Moderate',fuel:'Volatile leaf oils; thick furrowed bark provides partial protection',
+   immEffect:'8–260 kW/m fireline intensity in AZ spring prescribes; furrowed bark more protective than oneseed juniper',
+   tags:['t-rs:Partial resprouter (42%)','t-sd:Seeder'],
+   feis:'42% resprout after AZ burns — nearly 4× the rate of oneseed juniper. Thick furrowed bark (vs. thin scaly bark of oneseed juniper) provides partial protection. Important component of AZ pine-oak woodland fire corridor.',
+   cite:'FEIS: Pavek 1994 (Juniperus deppeana); Johnson 2002 (Juniperus monosperma)'},
+
+  {id:'paloverde',cat:'tree',catLabel:'Tree',icon:'🌳',invasive:false,
+   name:'Blue Paloverde',sci:'Parkinsonia florida',inatName:'Parkinsonia florida',wikiPage:'Parkinsonia_florida',
+   inatUrl:'https://www.inaturalist.org/taxa/63603',
+   feisUrl:'https://research.fs.usda.gov/feis/species-reviews/parflo',
+   mapLat:32.3,mapLng:-111.7,mapZoom:7,
+   mapNote:'Sonoran Desert washes and bajadas: Tucson Basin, Phoenix metro, lower Gila drainage · below 4,000 ft',
+   zone:'Sonoran Desert Washes · <4,000 ft',severity:'low',sevLabel:'Low',
+   fri:'>35–100 yrs',friPct:65,flame:'1–3 ft',flamePct:20,ros:'Very Low',fuel:'Fuel-limited native desert; green photosynthetic bark',
+   immEffect:'Small trees highly vulnerable; green bark slows ignition slightly; seedlings easily killed',
+   tags:['t-rs:Partial resprouter','t-fk:Seedling fire-killed'],
+   feis:'Critical nurse plant for saguaro. Buffelgrass invasions transform fire-resistant desert scrub into fire-prone landscape; paloverde mortality high in buffelgrass-fueled fires (871–900°C recorded).',
+   cite:'FEIS: Zouhar 2023 (Sonoran Desert scrub)'},
+
+  // SHRUBS
+  {id:'manzanita',cat:'shrub',catLabel:'Shrub',icon:'🌿',invasive:false,
+   name:'Pointleaf Manzanita',sci:'Arctostaphylos pungens',inatName:'Arctostaphylos pungens',wikiPage:'Arctostaphylos_pungens',
+   inatUrl:'https://www.inaturalist.org/taxa/58892',
+   feisUrl:'https://www.fs.usda.gov/database/feis/plants/shrub/arcpun/all.html',
+   mapLat:34.1,mapLng:-111.2,mapZoom:7,
+   mapNote:'AZ Chaparral belt: Sierra Ancha, Bradshaw Mtns, Pinal Mtns, Mogollon escarpment · 4,000–7,500 ft',
+   zone:'AZ Chaparral · 4,000–7,500 ft',severity:'high',sevLabel:'High',
+   fri:'15–52 yrs',friPct:42,flame:'8–15 ft',flamePct:75,ros:'High',fuel:'Resinous leaves & abundant fine dead branches',
+   immEffect:'Most plants top-killed by fire; established plants with lignotubers (basal burls) survive even high-intensity crown fire by resprouting from below-ground bud tissue',
+   tags:['t-rs:Strong basal burl resprouter','t-sd:Long-lived soil seed bank'],
+   feis:'Rapidly resprouts from lignotuber (basal burl) after crown fire. High-intensity fire preferred to crack hard seedcoat for seedling establishment. "Fire climax" community at Sierra Ancha, AZ.',
+   cite:'FEIS: League 2005 (Arctostaphylos pungens)'},
+
+  {id:'shrubliveoak',cat:'shrub',catLabel:'Shrub',icon:'🌿',invasive:false,
+   name:'Shrub Live Oak',sci:'Quercus turbinella',inatName:'Quercus turbinella',wikiPage:'Quercus_turbinella',
+   inatUrl:'https://www.inaturalist.org/taxa/49010',
+   feisUrl:'https://research.fs.usda.gov/feis/species-reviews/quetur',
+   mapLat:33.7,mapLng:-112.1,mapZoom:7,
+   mapNote:'Central & SE AZ chaparral: Bradshaws, Mazatzals, Pinal Mtns, Baboquivari · 4,000–7,000 ft',
+   zone:'AZ Chaparral · 4,000–7,000 ft',severity:'high',sevLabel:'Moderate–High',
+   fri:'15–40 yrs',friPct:38,flame:'5–10 ft',flamePct:55,ros:'Moderate',fuel:'Dense shrub layer; co-burns with manzanita',
+   immEffect:'Top-killed in most fires; lignotuber of established plants rarely completely destroyed',
+   tags:['t-rs:Vigorous lignotuber resprouter','t-in:Post-fire increaser'],
+   feis:'Dominant central/SE AZ chaparral species. Fire exclusion allowed scrub oak to replace ponderosa pine successionally in many AZ forests. Co-dominant with manzanita in Sierra Ancha chaparral studies.',
+   cite:'FEIS: Pavek 1994 (Quercus turbinella)'},
+
+  {id:'brittlebush',cat:'shrub',catLabel:'Shrub',icon:'🌿',invasive:false,
+   name:'Brittlebush',sci:'Encelia farinosa',inatName:'Encelia farinosa',wikiPage:'Encelia_farinosa',
+   inatUrl:'https://www.inaturalist.org/taxa/49339',
+   feisUrl:'https://research.fs.usda.gov/feis/species-reviews/encfar',
+   mapLat:33.45,mapLng:-112.0,mapZoom:7,
+   mapNote:'Sonoran Desert bajadas & rocky slopes statewide: Phoenix Basin, Tucson Basin, Ajo · below 3,000 ft',
+   zone:'Sonoran Desert Bajadas · <3,000 ft',severity:'low',sevLabel:'Low',
+   fri:'>35–100 yrs',friPct:55,flame:'1–2 ft',flamePct:18,ros:'Low',fuel:'Dried resinous stems; annual grass-carried fire',
+   immEffect:'Crown top-killed rapidly; fast-moving low-intensity fire characteristic of Sonoran desert burns',
+   tags:['t-rs:Weak/variable basal resprouter','t-sd:Primary regeneration by seed'],
+   feis:'Weak to variable resprouter; resprouting depends on fire intensity — 0% resprouted after complete burn, 6.4% after scorching in western Sonoran Desert. Seeds establish readily postfire. Buffelgrass-driven fire cycles increasingly threaten native desert scrub communities including brittlebush.',
+   cite:'FEIS: Brahmsteadt 2024 (Encelia farinosa)'},
+
+  {id:'catclaw',cat:'shrub',catLabel:'Shrub',icon:'🌿',invasive:false,
+   name:'Catclaw Acacia',sci:'Senegalia greggii',inatName:'Senegalia greggii',wikiPage:'Senegalia_greggii',
+   inatUrl:'https://www.inaturalist.org/taxa/79056',
+   feisUrl:'https://www.fs.usda.gov/database/feis/plants/shrub/acagre/all.html',
+   mapLat:32.5,mapLng:-110.8,mapZoom:7,
+   mapNote:'Desert washes & riparian margins statewide: Salt R., Verde R., San Pedro, Gila · below 5,000 ft',
+   zone:'Desert Washes · <5,000 ft',severity:'low',sevLabel:'Low–Moderate',
+   fri:'5–25 yrs',friPct:40,flame:'1–4 ft',flamePct:22,ros:'Low–Moderate',fuel:'Variable with herbaceous fuel load',
+   immEffect:'Smaller plants top-killed; larger multi-stemmed shrubs often partially damaged',
+   tags:['t-rs:Root crown resprouter','t-sd:Abundant persistent seed'],
+   feis:'Like mesquite, resprouts readily from root crown and lateral roots; fire rarely provides effective shrub control. Member of the Catclaw Acacia–Desert-lavender Desert Wash Scrub Alliance.',
+   cite:'FEIS: Gucker 2006 (Senegalia greggii / Acacia greggii)'},
+
+  {id:'skunkbush',cat:'shrub',catLabel:'Shrub',icon:'🌿',invasive:false,
+   name:'Skunkbush Sumac',sci:'Rhus trilobata',inatName:'Rhus trilobata',wikiPage:'Rhus_trilobata',
+   inatUrl:'https://www.inaturalist.org/taxa/867365',
+   feisUrl:'https://www.fs.usda.gov/database/feis/plants/shrub/rhutri/all.html',
+   mapLat:34.5,mapLng:-110.4,mapZoom:7,
+   mapNote:'P-J / grassland ecotone: White Mtns, Springerville, Prescott foothills, SE AZ · 3,500–7,000 ft',
+   zone:'P-J / Grassland Ecotone · 3,500–7,000 ft',severity:'low',sevLabel:'Low–Moderate',
+   fri:'5–35 yrs',friPct:35,flame:'1–4 ft',flamePct:25,ros:'Low',fuel:'Resin-rich foliage burns readily when dry',
+   immEffect:'Top-killed in most range fires; deep root crown rarely damaged even in moderate fires',
+   tags:['t-rs:Strong root crown resprouter'],
+   feis:'Facultative resprouter; returns rapidly from root crown after top-kill. Important shrub in pinyon-juniper woodlands and AZ/NM desert grassland plant community classifications.',
+   cite:'FEIS: Gucker 2003 (Rhus trilobata)'},
+
+  {id:'snakeweed',cat:'shrub',catLabel:'Shrub',icon:'🌿',invasive:false,
+   name:'Broom Snakeweed',sci:'Gutierrezia sarothrae',inatName:'Gutierrezia sarothrae',wikiPage:'Gutierrezia_sarothrae',
+   inatUrl:'https://www.inaturalist.org/taxa/77312',
+   feisUrl:'https://www.fs.usda.gov/database/feis/plants/shrub/gutsar/all.html',
+   mapLat:35.1,mapLng:-111.7,mapZoom:7,
+   mapNote:'Desert grassland & degraded range statewide: Flagstaff N, Navajo Plateau, Prescott Basin · 2,500–7,000 ft',
+   zone:'Desert Grassland · 2,500–7,000 ft',severity:'low',sevLabel:'Low',
+   fri:'5–20 yrs',friPct:25,flame:'1–3 ft',flamePct:20,ros:'Low',fuel:'Fine resinous stems carry fire readily',
+   immEffect:'Most plants top-killed or killed outright by low-severity fire',
+   tags:['t-sd:Rapid seeder','t-in:Overgrazing & disturbance increaser'],
+   feis:'Short-lived perennial subshrub; most plants killed or top-killed by fire but recovers quickly from seed. Indicator of degraded or overused range. Common preburn species in N AZ Flagstaff galleta-grama-oneseed juniper burn studies (Jameson).',
+   cite:'FEIS: Gucker 2003 (Gutierrezia sarothrae); Jameson burn study (Flagstaff AZ)'},
+
+  // FORBS
+  {id:'saguaro',cat:'forb',catLabel:'Forb / Cactus',icon:'🌵',invasive:false,
+   name:'Saguaro Cactus',sci:'Carnegiea gigantea',inatName:'Carnegiea gigantea',wikiPage:'Carnegiea_gigantea',
+   inatUrl:'https://www.inaturalist.org/taxa/54449',
+   feisUrl:'https://research.fs.usda.gov/feis/species-reviews/cargig',
+   mapLat:32.2,mapLng:-111.1,mapZoom:7,
+   mapNote:'Sonoran Desert core: Tucson Basin, Saguaro NP, Superstitions, lower Salt & Gila drainages · below 4,000 ft',
+   zone:'Sonoran Desert · <4,000 ft',severity:'ext',sevLabel:'Extreme (when burns)',
+   fri:'>100 yrs',friPct:85,flame:'Passive',flamePct:5,ros:'N/A — no fuel contribution',fuel:'Zero fuel; passive victim of surrounding fires',
+   immEffect:'Mortally injured by fire; heat & stem scarring causes delayed death over months to years',
+   tags:['t-fk:Fire-killed — no resprouting','t-sd:Seed only; no vegetative regen'],
+   feis:"Cannot resprout; no vegetative regeneration. Seeds do not persist in the soil seed bank. Seedling establishment requires nurse plants — primarily yellow paloverde (Parkinsonia microphylla), ironwood (Olneya tesota), and velvet mesquite — all killed or reduced by fire. Recovery takes 50–150+ yrs. Keystone species and dominant indicator of the Sonoran Desert.",
+   cite:'FEIS: Helmy 2021 (Carnegiea gigantea)'},
+
+  {id:'yucca',cat:'forb',catLabel:'Forb / Yucca',icon:'🌿',invasive:false,
+   name:'Banana Yucca',sci:'Yucca baccata',inatName:'Yucca baccata',wikiPage:'Yucca_baccata',
+   inatUrl:'https://www.inaturalist.org/taxa/47788',
+   feisUrl:'https://www.fs.usda.gov/database/feis/plants/shrub/yucbac/all.html',
+   mapLat:33.9,mapLng:-110.6,mapZoom:7,
+   mapNote:'Broad distribution: desert grassland to P-J to chaparral — White Mtns, Tonto Basin, SE AZ mountains · 2,500–7,500 ft',
+   zone:'Desert Grassland / Chaparral · 2,500–7,500 ft',severity:'mod',sevLabel:'Moderate',
+   fri:'10–40 yrs',friPct:38,flame:'Moderate',flamePct:30,ros:'Low',fuel:'Dead leaf skirt creates localized hot spot',
+   immEffect:'Rosette top-killed in moderate fires; deep bud tissue in succulent stem protected',
+   tags:['t-rs:Deep bud resprouter'],
+   feis:'Resilient resprouter from adventitious buds and root crown below lethal-heat zone. Dead leaf skirt creates localized intense combustion but underground crown survives. Rhizomes allow lateral sprouting. Occurs across a wide range from desert grassland to chaparral and pinyon-juniper woodland.',
+   cite:'FEIS: Groen 2005 (Yucca baccata)'},
+
+  {id:'marigold',cat:'forb',catLabel:'Forb',icon:'🌼',invasive:false,
+   name:'Desert Marigold',sci:'Baileya multiradiata',inatName:'Baileya multiradiata',wikiPage:'Baileya_multiradiata',
+   inatUrl:'https://www.inaturalist.org/taxa/68538',
+   feisUrl:'https://www.feis-crs.org/feis/',
+   mapLat:32.8,mapLng:-111.4,mapZoom:7,
+   mapNote:'Desert grassland statewide: Maricopa, Pinal, Pima counties — roadsides, washes, disturbed soils · 1,000–5,000 ft',
+   zone:'Desert Grassland · 1,000–5,000 ft',severity:'low',sevLabel:'Low',
+   fri:'5–25 yrs',friPct:30,flame:'Low',flamePct:15,ros:'Low',fuel:'Minimal; scattered rosettes provide little fuel',
+   immEffect:'Killed entirely by fire as annual/biennial; seeds in soil survive in persistent seed bank',
+   tags:['t-sd:Seeder; persistent seed bank','t-in:Post-fire increaser'],
+   feis:'Rapid colonizer of disturbed or recently burned soil; often among first forbs to establish after desert grassland fires. Provides early post-fire ground cover and reduces erosion.',
+   cite:'FEIS: Semidesert grassland fire regime; no dedicated FEIS species review for Baileya multiradiata'},
+
+  {id:'filaree',cat:'forb',catLabel:'Forb (Invasive)',icon:'🌸',invasive:true,
+   name:'Redstem Filaree',sci:'Erodium cicutarium',inatName:'Erodium cicutarium',wikiPage:'Erodium_cicutarium',
+   inatUrl:'https://www.inaturalist.org/taxa/47687',
+   feisUrl:'https://www.fs.usda.gov/database/feis/plants/forb/erocic/all.html',
+   mapLat:32.2,mapLng:-111.5,mapZoom:7,
+   mapNote:'Statewide disturbed soils & desert scrub: Tucson metro, Phoenix Basin, Altar Valley · all elevations',
+   zone:'Desert / Disturbed · All elevations',severity:'low',sevLabel:'Low',
+   fri:'Annual',friPct:20,flame:'Moderate',flamePct:30,ros:'Fast for desert context',fuel:'Dried winter annual mats — primary fine fuel carrier April–June',
+   immEffect:'Killed entirely; dried mats produce fast-spreading low-intensity fire across desert scrub',
+   tags:['t-sd:Prolific seeder; hygroscopic awns','t-in:Post-disturbance increaser','t-ob:Invasive annual'],
+   feis:'Dried mats in April–June primary fuel enabling fire spread across historically fireproof Sonoran Desert. Seeds self-bury with hygroscopic awns. First-year post-fire dominant forb; germinates with first fall rains.',
+   cite:'Frontiers in Ecology: Bighorn Fire study 2021; FEIS semidesert grassland fire regime'},
+
+  {id:'goldeneye',cat:'forb',catLabel:'Forb',icon:'🌼',invasive:false,
+   name:'Longleaf False Goldeneye',sci:'Heliomeris longifolia var. annua',inatName:'Heliomeris longifolia',wikiPage:'Heliomeris_longifolia',
+   inatUrl:'https://www.inaturalist.org/taxa/1648160',
+   feisUrl:'https://www.feis-crs.org/feis/',
+   mapLat:31.7,mapLng:-109.9,mapZoom:8,
+   mapNote:'SE AZ Madrean grassland & oak woodland: Sonoita Grassland, Canelo Hills, Huachuca foothills · 3,500–6,000 ft',
+   zone:'SE AZ Grassland / Oak-Pine · 3,500–6,000 ft',severity:'low',sevLabel:'Low',
+   fri:'3–15 yrs',friPct:25,flame:'Low',flamePct:12,ros:'Low',fuel:'Minor direct fuel contribution',
+   immEffect:'Annual; entire plant consumed by fire; seeds survive in mineral soil',
+   tags:['t-sd:Annual seeder','t-in:Post-fire increaser'],
+   feis:'Common herb in semidesert grassland and Madrean oak woodland prescribes in SE Arizona. Rapid post-fire colonizer; prefire dominant in Bock & Bock AZ fire ecology series.',
+   cite:'FEIS: Semidesert grassland fire regime; Bock & Bock AZ oak savanna series (SE Arizona)'},
+
+  // GRASSES
+  {id:'sacaton',cat:'grass',catLabel:'Grass',icon:'🌾',invasive:false,
+   name:'Big Sacaton',sci:'Sporobolus wrightii',inatName:'Sporobolus wrightii',wikiPage:'Sporobolus_wrightii',
+   inatUrl:'https://www.inaturalist.org/taxa/79189',
+   feisUrl:'https://www.fs.usda.gov/database/feis/plants/graminoid/spowri/all.html',
+   mapLat:31.8,mapLng:-110.5,mapZoom:7,
+   mapNote:'Desert riparian floodplains: San Pedro, Santa Cruz, Sonoita Creek, lower Verde & Salt · below 5,000 ft',
+   zone:'Desert Riparian / Floodplains · <5,000 ft',severity:'mod',sevLabel:'Moderate',
+   fri:'2–10 yrs',friPct:30,flame:'3–6 ft',flamePct:55,ros:'Moderate',fuel:'390–515 g/m² peak standing crop; dense tussocks',
+   immEffect:'Top-killed; Feb 1985 SE AZ wildfire consumed all available sacaton forage',
+   tags:['t-rs:Tussock resprouter','t-to:Summer-fire tolerant'],
+   feis:'Sprouts after top-kill; burning stimulates leaf production. Best adapted to summer fires; fall/spring burning may have long-term negative effects. Hot early-summer fires may kill plants entirely.',
+   cite:'FEIS: Esser 1995 (Sporobolus wrightii); Bock & Bock 1986 seasonal fire study; Cox 1985 biomass data'},
+
+  {id:'bluegrama',cat:'grass',catLabel:'Grass',icon:'🌾',invasive:false,
+   name:'Blue Grama',sci:'Bouteloua gracilis',inatName:'Bouteloua gracilis',wikiPage:'Bouteloua_gracilis',
+   inatUrl:'https://www.inaturalist.org/taxa/71257',
+   feisUrl:'https://research.fs.usda.gov/feis/species-reviews/bougra',
+   mapLat:35.3,mapLng:-111.8,mapZoom:7,
+   mapNote:'Colorado Plateau & N AZ grasslands: Flagstaff plateau, Navajo Nation, Kaibab · 3,500–7,000 ft',
+   zone:'Desert / Semidesert Grassland · 3,500–7,000 ft',severity:'low',sevLabel:'Low',
+   fri:'3–15 yrs',friPct:22,flame:'1–3 ft',flamePct:25,ros:'Low–Moderate',fuel:'Short culms; broad coverage enables fire spread',
+   immEffect:'Top-killed; basal meristems protected below soil surface; no long-term negative effect on cover',
+   tags:['t-rs:Basal meristem resprouter','t-to:Fire-tolerant'],
+   feis:'Recovers well from fire. Dominant in galleta-black grama-oneseed juniper system in N AZ. Used in prescribes to control juniper encroachment — fire maintains grass dominance.',
+   cite:'FEIS: Esser 1995 (Bouteloua gracilis); Jameson oneseed juniper control study (N AZ)'},
+
+  {id:'sideoats',cat:'grass',catLabel:'Grass',icon:'🌾',invasive:false,
+   name:'Sideoats Grama',sci:'Bouteloua curtipendula',inatName:'Bouteloua curtipendula',wikiPage:'Bouteloua_curtipendula',
+   inatUrl:'https://www.inaturalist.org/taxa/75858',
+   feisUrl:'https://www.fs.usda.gov/database/feis/plants/graminoid/boucur/all.html',
+   mapLat:31.6,mapLng:-110.3,mapZoom:7,
+   mapNote:'SE AZ oak savanna & semidesert grassland: Sonoita, Canelo Hills, Patagonia, Huachuca valleys · 3,500–6,500 ft',
+   zone:'Semidesert Grassland / Oak Savanna · 3,500–6,500 ft',severity:'low',sevLabel:'Low–Moderate',
+   fri:'3–15 yrs',friPct:28,flame:'2–4 ft',flamePct:30,ros:'Moderate',fuel:'Important fire carrier in SE AZ oak savannas',
+   immEffect:'Top-killed; crown protected at soil surface; rapid regrowth after post-monsoon moisture',
+   tags:['t-rs:Basal resprouter','t-to:Fire-tolerant'],
+   feis:'Key fuel and fire carrier in Madrean oak-woodland prescribed burns. Dominant grass in SE AZ semidesert grassland post-fire community. Primary preburn grass in Bock & Bock AZ oak savanna studies.',
+   cite:'FEIS: Esser 1994 (Bouteloua curtipendula); Bock & Bock AZ oak savanna series'},
+
+  {id:'buffelgrass',cat:'grass',catLabel:'Grass (Invasive)',icon:'⚠️',invasive:true,
+   name:'Buffelgrass',sci:'Cenchrus ciliaris',inatName:'Cenchrus ciliaris',wikiPage:'Cenchrus_ciliaris',
+   inatUrl:'https://www.inaturalist.org/taxa/199408',
+   feisUrl:'https://research.fs.usda.gov/feis/species-reviews/pencil',
+   mapLat:32.15,mapLng:-111.0,mapZoom:7,
+   mapNote:'Sonoran Desert invasion front: Tucson Basin, Saguaro NP, Rincon Valley, spreading north toward Phoenix · below 4,000 ft',
+   zone:'Sonoran Desert Bajadas · <4,000 ft',severity:'ext',sevLabel:'Extreme',
+   fri:'1–5 yrs',friPct:12,flame:'6–12+ ft',flamePct:90,ros:'Extreme',fuel:'190–900 g/m²; fire temps 871–900°C directly recorded',
+   immEffect:'Resprouts after top-kill; post-fire conditions favor explosive seedling establishment',
+   tags:['t-rs:Crown resprouter (moisture-dependent)','t-sd:Short-term persistent soil seed bank','t-in:Post-fire increaser — explosive seedling establishment','t-ob:Invasive — HIGHEST THREAT'],
+   feis:'Fire-adapted invasive native to southern Europe, Africa, and southern Asia. Creates grass-fire cycle transforming native desert scrub. A single fire benefits buffelgrass while harming ALL native Sonoran Desert plants — many of which evolved without fire. Prescribed burning NOT recommended for control in Sonoran Desert.',
+   cite:'FEIS: Innes 2022 (Pennisetum ciliare); McDonald & McPherson 2013'},
+
+  {id:'lehmann',cat:'grass',catLabel:'Grass (Invasive)',icon:'⚠️',invasive:true,
+   name:'Lehmann Lovegrass',sci:'Eragrostis lehmanniana',inatName:'Eragrostis lehmanniana',wikiPage:'Eragrostis_lehmanniana',
+   inatUrl:'https://www.inaturalist.org/taxa/76852',
+   feisUrl:'https://research.fs.usda.gov/feis/species-reviews/eraleh',
+   mapLat:31.85,mapLng:-110.5,mapZoom:7,
+   mapNote:'SE AZ semidesert grassland invasion: Santa Rita, Empire Ranch, Sonoita, San Rafael Valley · 3,000–5,500 ft',
+   zone:'Semidesert Grassland · 3,000–5,500 ft',severity:'high',sevLabel:'High',
+   fri:'1–5 yrs',friPct:15,flame:'4–8 ft',flamePct:65,ros:'High',fuel:'110–600 g/m²; continuous cover enables near-annual fire',
+   immEffect:'Hot summer fires kill up to 98% of mature plants (Uchytil 1992); cooler winter fires cause little mortality. Recovery driven by seed bank and off-site seed dispersal — not plant-level resprouting.',
+   tags:['t-rs:Resprouter','t-in:Post-fire increaser','t-ob:Invasive — high threat'],
+   feis:"Introduced in the 1930s for range restoration purposes; now dominant across SE Arizona semidesert grasslands, having replaced native Arizona cottontop, threeawn, and grama grasses at Santa Rita Experimental Range. Dense continuous cover enables near-annual fires, dramatically outcompeting native grasses post-fire.",
+   cite:'FEIS: Uchytil 1992 (Eragrostis lehmanniana); Frontiers in Ecology: Bighorn Fire 2021'},
+
+  {id:'threeawn',cat:'grass',catLabel:'Grass',icon:'🌾',invasive:false,
+   name:'Purple Three-awn',sci:'Aristida purpurea',inatName:'Aristida purpurea',wikiPage:'Aristida_purpurea',
+   inatUrl:'https://www.inaturalist.org/taxa/75563',
+   feisUrl:'https://www.fs.usda.gov/database/feis/plants/graminoid/aripup/all.html',
+   mapLat:32.3,mapLng:-110.9,mapZoom:7,
+   mapNote:'Statewide desert to semidesert grassland: Tucson Basin, Altar Valley, Sonoita Plain, scattered N AZ · 2,000–6,500 ft',
+   zone:'Desert to Semidesert Grassland · 2,000–6,500 ft',severity:'low',sevLabel:'Low',
+   fri:'3–15 yrs',friPct:28,flame:'1–3 ft',flamePct:20,ros:'Low',fuel:'Fine-stemmed; dried culms very combustible; important fine fuel carrier',
+   immEffect:'Top-killed; high initial mortality possible in drought when post-fire monsoon fails',
+   tags:['t-rs:Tussock resprouter','t-to:Generally fire-tolerant'],
+   feis:'Native bunchgrass critical for Sonoran Desert grassland identity. High initial mortality in 2020 Bighorn Fire; absent monsoon prevented recovery. Key competitor with invasive grasses post-fire — recovery contingent on seasonal precipitation.',
+   cite:'FEIS; Frontiers: Bighorn Fire study 2021'},
+];
+
+// ── PHOTO ENGINE ──────────────────────────────────────────────────────────────
+// Priority chain: iNaturalist Taxa API → Wikipedia REST API → emoji placeholder
+// iNaturalist returns curated whole-plant field photos used in their own app
+const photoCache = {}; // { [id]: { photos:[{url,src,attribution}], loaded:bool } }
+
+// Extract numeric taxon ID from an inatUrl like https://www.inaturalist.org/taxa/48461
+function inatTaxonIdFromUrl(url) {
+  const m = url && url.match(/\/taxa\/(\d+)$/);
+  return m ? m[1] : null;
+}
+
+function extractPhotosFromTaxon(taxon) {
+  const photos = [];
+  if (taxon.default_photo?.medium_url) {
+    photos.push({
+      url: taxon.default_photo.medium_url.replace('/medium.', '/large.'),
+      thumb: taxon.default_photo.square_url || taxon.default_photo.medium_url,
+      src: 'iNaturalist',
+      attr: taxon.default_photo.attribution || ''
+    });
+  }
+  if (taxon.taxon_photos && taxon.taxon_photos.length > 1) {
+    for (const tp of taxon.taxon_photos.slice(1, 5)) {
+      const p = tp.photo;
+      if (p?.medium_url) {
+        photos.push({
+          url: p.medium_url.replace('/medium.', '/large.'),
+          thumb: p.square_url || p.medium_url,
+          src: 'iNaturalist',
+          attr: p.attribution || ''
+        });
+      }
+    }
+  }
+  return photos;
+}
+
+async function fetchInatPhotos(sp) {
+  if (photoCache[sp.id]?.loaded) return photoCache[sp.id];
+  photoCache[sp.id] = { photos:[], loaded:false };
+
+  // Strategy 1: Direct taxon lookup by numeric ID (most reliable)
+  const taxonId = inatTaxonIdFromUrl(sp.inatUrl);
+  if (taxonId) {
+    try {
+      const res = await fetch(
+        `https://api.inaturalist.org/v1/taxa/${taxonId}`,
+        { headers:{'Accept':'application/json'} }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const taxon = data?.results?.[0];
+        if (taxon) {
+          const photos = extractPhotosFromTaxon(taxon);
+          if (photos.length > 0) {
+            photoCache[sp.id] = { photos, loaded:true };
+            return photoCache[sp.id];
+          }
+        }
+      }
+    } catch(e) {}
+  }
+
+  // Strategy 2: Exact name search (is_active=true prevents matching synonyms)
+  try {
+    const url = `https://api.inaturalist.org/v1/taxa?q=${encodeURIComponent(sp.inatName)}&is_active=true&per_page=5`;
+    const res = await fetch(url, { headers:{'Accept':'application/json'} });
+    if (res.ok) {
+      const data = await res.json();
+      const taxon = (data?.results || []).find(t =>
+        t.name.toLowerCase() === sp.inatName.toLowerCase()
+      ) || data?.results?.[0];
+      if (taxon) {
+        const photos = extractPhotosFromTaxon(taxon);
+        if (photos.length > 0) {
+          photoCache[sp.id] = { photos, loaded:true };
+          return photoCache[sp.id];
+        }
+      }
+    }
+  } catch(e) {}
+
+  // Fallback: Wikipedia REST API
+  try {
+    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(sp.wikiPage)}`,
+      { headers:{'Accept':'application/json'} });
+    if (res.ok) {
+      const data = await res.json();
+      const orig = data?.thumbnail?.source;
+      if (orig) {
+        const large = orig.replace(/\/\d+px-/, '/640px-');
+        photoCache[sp.id] = {
+          photos:[{ url:large, thumb:orig, src:'Wikipedia', attr:'© Wikimedia Commons' }],
+          loaded:true
+        };
+        return photoCache[sp.id];
+      }
+    }
+  } catch(e) {}
+
+  photoCache[sp.id] = { photos:[], loaded:true };
+  return photoCache[sp.id];
+}
+
+// ── RENDER HELPERS ────────────────────────────────────────────────────────────
+const SEV_CLASS = {low:'sev-low',mod:'sev-mod',high:'sev-high',ext:'sev-ext',var:'sev-var'};
+function sevCls(s){ return SEV_CLASS[s]||'sev-var'; }
+function renderTag(t){ const [c,...r]=t.split(':'); return `<span class="tag ${c}">${r.join(':')}</span>`; }
+
+// ── CARDS ─────────────────────────────────────────────────────────────────────
+function buildCard(sp, idx) {
+  const cache = photoCache[sp.id];
+  let photoHtml;
+  if (cache?.photos?.length) {
+    const p = cache.photos[0];
+    photoHtml = `<div class="photo-box" id="pb-${sp.id}">
+      <img src="${p.url}" alt="${sp.name}" loading="lazy" class="loading"
+        onload="this.classList.replace('loading','loaded')"
+        onerror="this.parentNode.innerHTML='<div class=\\"photo-placeholder\\"><span>${sp.icon}</span><small>No photo</small></div>'">
+      <span class="photo-src">${p.src}</span>
+      <a class="photo-inat-link" href="${sp.inatUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="View ${sp.name} on iNaturalist"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z"/></svg>iNat ↗</a>
+    </div>`;
+  } else if (cache?.loaded) {
+    photoHtml = `<div class="photo-placeholder" id="pb-${sp.id}"><span>${sp.icon}</span><small>Photo loading…</small></div>`;
+  } else {
+    photoHtml = `<div class="shimmer" id="pb-${sp.id}"></div>`;
+  }
+  return `<div class="card" style="animation-delay:${idx*25}ms" onclick="openModal('${sp.id}')">
+    ${photoHtml}
+    <div class="card-body">
+      <div class="card-cat">${sp.icon} ${sp.catLabel}</div>
+      <div class="card-name">${sp.name}</div>
+      <span class="card-sci">${sp.sci}</span>
+      <span class="sev-pill ${sevCls(sp.severity)}">${sp.sevLabel}</span>
+    </div>
+  </div>`;
+}
+
+async function loadCardPhoto(sp) {
+  const el = document.getElementById(`pb-${sp.id}`);
+  if (!el) return;
+  const cache = await fetchInatPhotos(sp);
+  const fresh = document.getElementById(`pb-${sp.id}`);
+  if (!fresh) return;
+  if (cache.photos.length) {
+    const p = cache.photos[0];
+    fresh.outerHTML = `<div class="photo-box" id="pb-${sp.id}">
+      <img src="${p.url}" alt="${sp.name}" loading="lazy" class="loading"
+        onload="this.classList.replace('loading','loaded')"
+        onerror="this.parentNode.innerHTML='<div class=\\"photo-placeholder\\"><span>${sp.icon}</span><small>No photo</small></div>'">
+      <span class="photo-src">${p.src}</span>
+      <a class="photo-inat-link" href="${sp.inatUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="View ${sp.name} on iNaturalist"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z"/></svg>iNat ↗</a>
+    </div>`;
+  } else {
+    fresh.outerHTML = `<div class="photo-placeholder"><span>${sp.icon}</span><small>No photo available</small></div>`;
+  }
+}
+
+// ── MODAL GALLERY ─────────────────────────────────────────────────────────────
+let galleryPhotos = [];
+let galleryIdx = 0;
+
+function selectGalleryPhoto(idx) {
+  galleryIdx = idx;
+  const main = document.getElementById('gallery-main');
+  const counter = document.getElementById('gallery-counter');
+  if (!main) return;
+  main.classList.add('fading');
+  setTimeout(() => {
+    main.src = galleryPhotos[idx].url;
+    main.onload = () => main.classList.remove('fading');
+    if (counter) counter.textContent = `${idx+1} / ${galleryPhotos.length}`;
+  }, 150);
+  document.querySelectorAll('.gthumb').forEach((t,i) => t.classList.toggle('active', i===idx));
+}
+
+async function openModal(id) {
+  const sp = SPECIES.find(s=>s.id===id);
+  if (!sp) return;
+  galleryPhotos = [];
+  galleryIdx = 0;
+
+  // Show modal immediately with placeholder
+  const inner = document.getElementById('modalInner');
+  inner.innerHTML = `
+    <div class="modal-gallery" id="modal-gallery">
+      <div class="gallery-placeholder">${sp.icon}</div>
+      <div class="gallery-overlay"></div>
+      <div class="gallery-badge">📍 ${sp.zone}</div>
+      <span class="gallery-src" id="gallery-src-label">Loading…</span>
+    </div>
+    <div class="modal-content">
+      <div class="modal-eyebrow">${sp.icon} ${sp.catLabel}${sp.invasive?' <span class="inv-badge">⚠ Invasive</span>':''}</div>
+      <div class="modal-name">${sp.name}</div>
+      <span class="modal-sci">${sp.sci}</span>
+      <span class="modal-sev ${sevCls(sp.severity)}">${sp.sevLabel} Fire Severity</span>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="stat-label">Fire Return Interval</div><div class="stat-val">${sp.fri}</div><div class="fbar"><div class="ftrack"><div class="ffill" style="width:${sp.friPct}%"></div></div></div></div>
+        <div class="stat-box"><div class="stat-label">Flame Length</div><div class="stat-val">${sp.flame}</div><div class="fbar"><div class="ftrack"><div class="ffill" style="width:${sp.flamePct}%"></div></div></div></div>
+        <div class="stat-box"><div class="stat-label">Rate of Spread</div><div class="stat-val" style="font-size:13px">${sp.ros}</div></div>
+        <div class="stat-box"><div class="stat-label">Fuel Load</div><div class="stat-val" style="font-size:11px;line-height:1.3">${sp.fuel}</div></div>
+      </div>
+      <div class="sh">Immediate Fire Effect</div>
+      <p class="desc-txt">${sp.immEffect}</p>
+      <div class="sh">Post-Fire Response</div>
+      <div class="tags-row">${sp.tags.map(renderTag).join('')}</div>
+      <div class="sh">Range Map — Arizona</div>
+      <div class="map-section">
+        <div class="map-container" id="species-map-${sp.id}"></div>
+        <div class="map-note-box">📍 ${sp.mapNote || sp.zone}</div>
+      </div>
+      <div class="sh">FEIS Notes</div>
+      <div class="feis-block">${sp.feis}<span class="feis-cite">📖 <a href="${sp.feisUrl}" target="_blank" rel="noopener" style="color:rgba(255,140,0,.65);text-decoration:none;">${sp.cite} ↗</a></span></div>
+      ${sp.feisUrl && sp.feisUrl !== 'https://www.feis-crs.org/feis/' ? `
+      <a class="feis-link" href="${sp.feisUrl}" target="_blank" rel="noopener">
+        <span class="feis-link-icon">🔥</span>
+        <span class="feis-link-txt"><strong>Full FEIS Species Review — USDA Forest Service</strong>Peer-reviewed fire ecology synthesis · Biology, fire effects & management</span>
+        <span class="feis-link-arrow">↗</span>
+      </a>` : `
+      <a class="feis-link feis-link-nodoc" href="https://www.feis-crs.org/feis/" target="_blank" rel="noopener">
+        <span class="feis-link-icon">🔥</span>
+        <span class="feis-link-txt"><strong>Search FEIS Database — USDA Forest Service</strong>No dedicated species review — search fire regime &amp; fire study records</span>
+        <span class="feis-link-arrow">↗</span>
+      </a>`}
+      <a class="inat-link" href="${sp.inatUrl}" target="_blank">
+        <span class="inat-link-icon">🌿</span>
+        <span class="inat-link-txt"><strong>View on iNaturalist</strong>Observations, full photo gallery & range maps</span>
+        <span class="inat-link-arrow">↗</span>
+      </a>
+    </div>`;
+
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('modalOverlay').classList.add('open');
+  document.getElementById('modal').scrollTop = 0;
+  document.body.style.overflow = 'hidden';
+
+  // Initialize Leaflet map for this species
+  setTimeout(() => {
+    const mapEl = document.getElementById(`species-map-${sp.id}`);
+    if (!mapEl || mapEl._leaflet_id) return;
+    const lat = sp.mapLat || 33.5;
+    const lng = sp.mapLng || -111.9;
+    const zoom = sp.mapZoom || 7;
+
+    const map = L.map(mapEl, {
+      center: [lat, lng],
+      zoom: zoom,
+      zoomControl: true,
+      scrollWheelZoom: false,
+      dragging: true,
+      attributionControl: true
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 13
+    }).addTo(map);
+
+    // AZ state boundary polygon (simplified)
+    const azBoundary = [
+      [37.000,-114.050],[37.000,-109.045],[31.332,-109.045],
+      [31.332,-111.075],[31.332,-111.075],[31.745,-111.075],
+      [31.745,-114.815],[32.718,-114.720],[32.718,-114.720],
+      [34.449,-114.133],[36.141,-114.253],[36.141,-114.738],
+      [37.000,-114.050]
+    ];
+    L.polygon(azBoundary, {
+      color: 'rgba(255,140,0,0.5)',
+      weight: 1.5,
+      fill: false,
+      dashArray: '4,4'
+    }).addTo(map);
+
+    // Severity color for marker
+    const sevColors = {low:'#56C077',mod:'#FFC107',high:'#FF6B35',ext:'#E53935',var:'#9898ff'};
+    const markerColor = sevColors[sp.severity] || '#FF8C00';
+
+    // Custom fire marker
+    const markerIcon = L.divIcon({
+      className: '',
+      html: `<div style="
+        width:36px;height:36px;
+        background:${markerColor};
+        border:3px solid rgba(255,255,255,0.9);
+        border-radius:50% 50% 50% 0;
+        transform:rotate(-45deg);
+        box-shadow:0 2px 12px rgba(0,0,0,0.6);
+        display:flex;align-items:center;justify-content:center;
+      "><span style="transform:rotate(45deg);font-size:14px;display:block;margin-top:2px;">${sp.icon}</span></div>`,
+      iconSize: [36, 36],
+      iconAnchor: [18, 36],
+      popupAnchor: [0, -38]
+    });
+
+    const marker = L.marker([lat, lng], { icon: markerIcon }).addTo(map);
+    marker.bindPopup(`
+      <strong style="color:#FF8C00;font-size:13px;">${sp.icon} ${sp.name}</strong><br>
+      <em style="color:rgba(200,184,154,0.6);font-size:10px;">${sp.sci}</em><br>
+      <span style="color:rgba(200,184,154,0.8);font-size:11px;">📍 ${sp.zone}</span>
+    `, { maxWidth: 200 });
+    marker.openPopup();
+  }, 350);
+
+  // Async: fetch and inject real photos
+  const cache = await fetchInatPhotos(sp);
+  const gallery = document.getElementById('modal-gallery');
+  if (!gallery) return;
+
+  if (cache.photos.length) {
+    galleryPhotos = cache.photos;
+    const mainUrl = cache.photos[0].url;
+    const srcLabel = cache.photos[0].src;
+    const thumbsHtml = cache.photos.length > 1
+      ? `<div class="gallery-thumbs">${cache.photos.map((p,i)=>`<img class="gthumb${i===0?' active':''}" src="${p.thumb}" onclick="selectGalleryPhoto(${i})" alt="photo ${i+1}">`).join('')}</div>`
+      : '';
+    const counterHtml = cache.photos.length > 1
+      ? `<span class="gallery-counter" id="gallery-counter">1 / ${cache.photos.length}</span>` : '';
+
+    gallery.innerHTML = `
+      <img id="gallery-main" class="gallery-main" src="${mainUrl}" alt="${sp.name}">
+      <div class="gallery-overlay"></div>
+      <div class="gallery-badge">📍 ${sp.zone}</div>
+      <span class="gallery-src" id="gallery-src-label">${srcLabel}</span>
+      ${counterHtml}
+      ${thumbsHtml}`;
+  } else {
+    gallery.innerHTML = `
+      <div class="gallery-placeholder">${sp.icon}</div>
+      <div class="gallery-overlay"></div>
+      <div class="gallery-badge">📍 ${sp.zone}</div>
+      <span class="gallery-src">No photo found</span>`;
+  }
+}
+
+function closeModal() {
+  // Clean up any Leaflet map instances inside the modal
+  document.querySelectorAll('#modalInner .map-container').forEach(el => {
+    if (el._leaflet_id) {
+      try { el._leaflet.remove(); } catch(e) {}
+    }
+  });
+  document.getElementById('modal').classList.remove('open');
+  document.getElementById('modalOverlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+
+// ── FILTER & SEARCH ────────────────────────────────────────────────────────────
+let currentFilter='all', currentSearch='';
+
+function render() {
+  const q = currentSearch.toLowerCase().trim();
+  const grid = document.getElementById('cardsGrid');
+  const empty = document.getElementById('emptyState');
+  const bar = document.getElementById('resultsBar');
+
+  const visible = SPECIES.filter(sp => {
+    const catOk = currentFilter==='all' || sp.cat===currentFilter || (currentFilter==='invasive' && sp.invasive);
+    const searchOk = !q || sp.name.toLowerCase().includes(q) || sp.sci.toLowerCase().includes(q) || sp.catLabel.toLowerCase().includes(q);
+    return catOk && searchOk;
+  });
+
+  if (!visible.length) {
+    grid.innerHTML=''; empty.classList.add('visible');
+    bar.textContent='0 species'; return;
+  }
+  empty.classList.remove('visible');
+  grid.innerHTML = visible.map((sp,i)=>buildCard(sp,i)).join('');
+  bar.textContent = visible.length===SPECIES.length ? `${SPECIES.length} species` : `${visible.length} of ${SPECIES.length} species`;
+
+  // Async load photos for shimmers
+  visible.forEach(sp => { if (!photoCache[sp.id]?.loaded) loadCardPhoto(sp); });
+}
+
+function setFilter(f,btn) {
+  currentFilter=f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+const searchInput=document.getElementById('searchInput');
+const clearBtn=document.getElementById('clearBtn');
+searchInput.addEventListener('input',e=>{
+  currentSearch=e.target.value;
+  clearBtn.classList.toggle('visible',currentSearch.length>0);
+  render();
+});
+function clearSearch(){
+  searchInput.value=''; currentSearch='';
+  clearBtn.classList.remove('visible');
+  searchInput.focus(); render();
+}
+
+// Swipe-down to close modal
+let startY=0;
+document.getElementById('modal').addEventListener('touchstart',e=>{startY=e.touches[0].clientY;},{passive:true});
+document.getElementById('modal').addEventListener('touchend',e=>{
+  if(e.changedTouches[0].clientY-startY>80 && document.getElementById('modal').scrollTop<10) closeModal();
+},{passive:true});
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+render();
+
+// Pre-fetch first 6 species in background immediately
+(async()=>{
+  for(const sp of SPECIES.slice(0,6)){
+    await fetchInatPhotos(sp);
+    const el=document.getElementById(`pb-${sp.id}`);
+    if(el && photoCache[sp.id]?.photos?.length){
+      const p=photoCache[sp.id].photos[0];
+      el.outerHTML=`<div class="photo-box" id="pb-${sp.id}">
+        <img src="${p.url}" alt="${sp.name}" loading="lazy" class="loading"
+          onload="this.classList.replace('loading','loaded')"
+          onerror="this.parentNode.innerHTML='<div class=\\"photo-placeholder\\"><span>${sp.icon}</span></div>'">
+        <span class="photo-src">${p.src}</span>
+        <a class="photo-inat-link" href="${sp.inatUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="View ${sp.name} on iNaturalist"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z"/></svg>iNat ↗</a>
+      </div>`;
+    }
+  }
+})();
+</script>
+</body>
+</html>
